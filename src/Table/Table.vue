@@ -43,25 +43,39 @@
   /* eslint-disable no-underscore-dangle */
   /* eslint-disable no-param-reassign */
 
-  function getBodyData(data, isTreeType, childrenProp, isFold, level = 1) {
+  function getBodyData(primaryKey, oldBodyData, data, isTreeType, childrenProp, isFold,
+    parentFold, level = 1) {
     let bodyData = [];
     data.forEach((row, index) => {
       const children = row[childrenProp];
       const childrenLen = Object.prototype.toString.call(children).slice(8, -1) === 'Array' ? children.length : 0;
+      let curIsFold = isFold;
+      if (isFold && typeof primaryKey === 'string' && Array.isArray(oldBodyData)) {
+        for (let i = 0; i < oldBodyData.length; i++) {
+          const oldRow = oldBodyData[i];
+          if (oldRow[primaryKey] === row[primaryKey]) {
+            if ('_isFold' in oldRow) {
+              curIsFold = oldRow._isFold;
+            }
+            break;
+          }
+        }
+      }
       bodyData.push({
         _isHover: false,
         _isExpanded: false,
         _isChecked: false,
         _level: level,
-        _isHide: isFold ? level !== 1 : false,
-        _isFold: isFold,
+        _isHide: (level !== 1) ? (isFold && parentFold) : false,
+        _isFold: isFold && curIsFold,
         _childrenLen: childrenLen,
         _normalIndex: index + 1,
         ...row,
       });
       if (isTreeType) {
         if (childrenLen > 0) {
-          bodyData = bodyData.concat(getBodyData(children, true, childrenProp, isFold, level + 1));
+          bodyData = bodyData.concat(getBodyData(primaryKey, oldBodyData, children, true,
+          childrenProp, isFold, curIsFold, level + 1));
         }
       }
     });
@@ -72,7 +86,8 @@
     return {
       bodyHeight: 'auto',
       firstProp: expandKey || (table.columns[0] && table.columns[0].key),
-      bodyData: getBodyData(table.data, table.treeType, table.childrenProp, table.isFold),
+      bodyData: getBodyData(table.primaryKey, table.bodyData, table.data, table.treeType,
+        table.childrenProp, table.isFold, false),
     };
   }
 
@@ -220,6 +235,7 @@
         default: true,
       },
       rowKey: Function,
+      primaryKey: String,
       rowClassName: [String, Function],
       cellClassName: [String, Function],
       rowStyle: [Object, Function],
